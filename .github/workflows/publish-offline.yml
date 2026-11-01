@@ -1,0 +1,28 @@
+name: Publish offline PySide6 dependencies
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Download official dependencies
+        run: |
+          python -m pip download --index-url https://pypi.org/simple --only-binary=:all: --platform win_amd64 --python-version 3.11 --implementation cp --abi abi3 --dest packages/windows-x64/wheels PySide6==6.12.0
+          python -m pip download --index-url https://pypi.org/simple --only-binary=:all: --platform macosx_14_0_universal2 --python-version 3.11 --implementation cp --abi abi3 --dest packages/macos/wheels PySide6==6.12.0
+      - name: Build offline packages
+        run: |
+          for platform in windows-x64 macos; do
+            (cd packages/$platform && sha256sum wheels/*.whl > SHA256SUMS.txt && zip -0 -r ../../PySide6-6.12.0-$platform-offline.zip wheels SHA256SUMS.txt)
+          done
+          sha256sum PySide6-6.12.0-*-offline.zip > SHA256SUMS.txt
+      - name: Publish release attachments
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: gh release upload v6.12.0-offline PySide6-6.12.0-windows-x64-offline.zip PySide6-6.12.0-macos-offline.zip SHA256SUMS.txt --clobber
